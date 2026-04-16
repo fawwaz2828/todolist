@@ -1,8 +1,16 @@
 {
-  "servers": {
-    "github": {
-      "command": "/bin/sh",
-      "args": ["${workspaceFolder}/.vscode/github-mcp.sh"]
-    }
-  }
+	"servers": {
+		"github": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-github"
+			],
+			"env": {
+				"GITHUB_PERSONAL_ACCESS_TOKEN": "<YOUR_TOKEN>"
+			},
+			"type": "stdio"
+		}
+	},
+	"inputs": []
 }
