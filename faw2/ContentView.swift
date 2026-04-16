@@ -118,9 +118,30 @@ struct ContentView: View {
     @EnvironmentObject private var store: TodoStore
     @State private var newTodoTitle = ""
 
+    private var activeTodos: [Todo] { store.todos.filter { !$0.isCompleted } }
+    private var completedTodos: [Todo] { store.todos.filter { $0.isCompleted } }
+    private var progress: Double {
+        guard !store.todos.isEmpty else { return 0 }
+        return Double(completedTodos.count) / Double(store.todos.count)
+    }
+
     var body: some View {
         NavigationStack {
             List {
+                // Progress card
+                if !store.todos.isEmpty {
+                    Section {
+                        ProgressCard(
+                            total: store.todos.count,
+                            completed: completedTodos.count,
+                            progress: progress
+                        )
+                    }
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowBackground(Color.clear)
+                }
+
+                // Input tambah task
                 Section {
                     AddTodoRow(title: $newTodoTitle) {
                         store.add(title: newTodoTitle)
@@ -128,26 +149,85 @@ struct ContentView: View {
                     }
                 }
 
-                Section("Tasks") {
-                    ForEach(store.todos) { todo in
-                        NavigationLink(value: todo.id) {
-                            TodoRowLabel(todo: todo)
-                        }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                guard let id = todo.id else { return }
-                                store.removeTodo(id: id)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
+                // Task aktif
+                if !activeTodos.isEmpty {
+                    Section {
+                        ForEach(activeTodos) { todo in
+                            NavigationLink(value: todo.id) {
+                                TodoRowLabel(todo: todo)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    guard let id = todo.id else { return }
+                                    store.removeTodo(id: id)
+                                } label: {
+                                    Label("Hapus", systemImage: "trash")
+                                }
+                            }
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                Button {
+                                    var updated = todo
+                                    updated.isCompleted = true
+                                    store.update(updated)
+                                } label: {
+                                    Label("Selesai", systemImage: "checkmark")
+                                }
+                                .tint(.green)
                             }
                         }
+                    } header: {
+                        SectionHeader(
+                            icon: "circle.dotted",
+                            title: "Aktif",
+                            count: activeTodos.count
+                        )
                     }
-                    .onDelete { offsets in
-                        store.removeTodos(at: offsets)
+                }
+
+                // Empty state
+                if store.todos.isEmpty {
+                    Section {
+                        EmptyStateView()
+                    }
+                    .listRowBackground(Color.clear)
+                }
+
+                // Task selesai
+                if !completedTodos.isEmpty {
+                    Section {
+                        ForEach(completedTodos) { todo in
+                            NavigationLink(value: todo.id) {
+                                TodoRowLabel(todo: todo)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    guard let id = todo.id else { return }
+                                    store.removeTodo(id: id)
+                                } label: {
+                                    Label("Hapus", systemImage: "trash")
+                                }
+                            }
+                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                Button {
+                                    var updated = todo
+                                    updated.isCompleted = false
+                                    store.update(updated)
+                                } label: {
+                                    Label("Aktifkan", systemImage: "arrow.uturn.left")
+                                }
+                                .tint(.orange)
+                            }
+                        }
+                    } header: {
+                        SectionHeader(
+                            icon: "checkmark.circle",
+                            title: "Selesai",
+                            count: completedTodos.count
+                        )
                     }
                 }
             }
-            .navigationTitle("Todos")
+            .navigationTitle("My Tasks")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     EditButton()
@@ -160,18 +240,89 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Subviews
+// MARK: - Progress Card
+
+private struct ProgressCard: View {
+    let total: Int
+    let completed: Int
+    let progress: Double
+
+    private var tint: Color { progress >= 1.0 ? .green : .accentColor }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(completed) dari \(total) task selesai")
+                        .font(.subheadline.weight(.medium))
+                    if progress >= 1.0 {
+                        Text("Semua task sudah selesai!")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                }
+                Spacer()
+                Text("\(Int(progress * 100))%")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(tint)
+                    .contentTransition(.numericText())
+            }
+            ProgressView(value: progress)
+                .tint(tint)
+                .animation(.spring(response: 0.4), value: progress)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+// MARK: - Section Header
+
+private struct SectionHeader: View {
+    let icon: String
+    let title: String
+    let count: Int
+
+    var body: some View {
+        Label {
+            Text("\(title) (\(count))")
+        } icon: {
+            Image(systemName: icon)
+        }
+        .font(.footnote.weight(.semibold))
+        .foregroundStyle(.primary)
+        .textCase(nil)
+    }
+}
+
+// MARK: - Todo Row Label
 
 private struct TodoRowLabel: View {
     let todo: Todo
 
     var body: some View {
-        HStack {
-            Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(todo.isCompleted ? .green : .secondary)
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .strokeBorder(
+                        todo.isCompleted ? Color.green : Color.secondary.opacity(0.4),
+                        lineWidth: 1.5
+                    )
+                    .frame(width: 26, height: 26)
+                if todo.isCompleted {
+                    Circle()
+                        .fill(Color.green.opacity(0.15))
+                        .frame(width: 26, height: 26)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.green)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(todo.title)
-                    .strikethrough(todo.isCompleted)
+                    .font(.body)
+                    .strikethrough(todo.isCompleted, color: .secondary)
+                    .foregroundStyle(todo.isCompleted ? .secondary : .primary)
                 if !todo.notes.isEmpty {
                     Text(todo.notes)
                         .font(.caption)
@@ -179,22 +330,71 @@ private struct TodoRowLabel: View {
                         .lineLimit(1)
                 }
             }
+
+            Spacer()
         }
+        .padding(.vertical, 3)
     }
 }
+
+// MARK: - Add Todo Row
 
 private struct AddTodoRow: View {
     @Binding var title: String
     var onCommit: () -> Void
+    @FocusState private var isFocused: Bool
+
+    private var canAdd: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     var body: some View {
-        HStack {
-            TextField("New task", text: $title)
+        HStack(spacing: 10) {
+            Image(systemName: "plus.circle.fill")
+                .font(.title3)
+                .foregroundStyle(isFocused ? .accentColor : .secondary)
+                .animation(.easeInOut(duration: 0.2), value: isFocused)
+
+            TextField("Tambah task baru…", text: $title)
                 .textInputAutocapitalization(.sentences)
+                .focused($isFocused)
                 .onSubmit(onCommit)
-            Button("Add", action: onCommit)
-                .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            if canAdd {
+                Button(action: onCommit) {
+                    Text("Tambah")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.accentColor, in: Capsule())
+                }
+                .transition(.scale(scale: 0.8).combined(with: .opacity))
+            }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: canAdd)
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Empty State
+
+private struct EmptyStateView: View {
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "checklist")
+                .font(.system(size: 52))
+                .foregroundStyle(.secondary.opacity(0.4))
+            Text("Belum ada task")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            Text("Tambahkan task pertama kamu di atas")
+                .font(.subheadline)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 48)
     }
 }
 
@@ -207,27 +407,70 @@ struct TodoDetailView: View {
 
     var body: some View {
         Form {
-            Section("Title") {
-                TextField("Title", text: $todo.title)
-            }
-            Section("Notes") {
-                TextField("Notes", text: $todo.notes, axis: .vertical)
-                    .lineLimit(3 ... 8)
-            }
             Section {
-                Toggle("Completed", isOn: $todo.isCompleted)
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .strokeBorder(
+                                todo.isCompleted ? Color.green : Color.secondary.opacity(0.4),
+                                lineWidth: 2
+                            )
+                            .frame(width: 28, height: 28)
+                        if todo.isCompleted {
+                            Circle()
+                                .fill(Color.green.opacity(0.15))
+                                .frame(width: 28, height: 28)
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.green)
+                        }
+                    }
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3)) {
+                            todo.isCompleted.toggle()
+                        }
+                    }
+                    TextField("Judul task", text: $todo.title)
+                        .font(.body.weight(.medium))
+                }
+            } header: {
+                Text("Task")
             }
+
+            Section {
+                TextField("Tambah catatan…", text: $todo.notes, axis: .vertical)
+                    .lineLimit(3 ... 8)
+            } header: {
+                Text("Catatan")
+            }
+
+            Section {
+                Toggle(isOn: $todo.isCompleted.animation()) {
+                    Label {
+                        Text("Tandai Selesai")
+                    } icon: {
+                        Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(todo.isCompleted ? .green : .secondary)
+                    }
+                }
+                .tint(.green)
+            }
+
             Section {
                 Button(role: .destructive) {
                     guard let id = todo.id else { return }
                     store.removeTodo(id: id)
                     dismiss()
                 } label: {
-                    Label("Delete Task", systemImage: "trash")
+                    HStack {
+                        Spacer()
+                        Label("Hapus Task", systemImage: "trash")
+                        Spacer()
+                    }
                 }
             }
         }
-        .navigationTitle("Edit")
+        .navigationTitle(todo.isCompleted ? "Task Selesai" : "Edit Task")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
