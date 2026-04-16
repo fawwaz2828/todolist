@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "github": {
+      "command": "/bin/sh",
+      "args": ["${workspaceFolder}/.vscode/github-mcp.sh"]
+    }
+  }
+}
