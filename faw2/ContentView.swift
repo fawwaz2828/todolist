@@ -2,476 +2,529 @@
 //  ContentView.swift
 //  faw2
 //
-import Foundation
 import SwiftUI
-import FirebaseFirestore
 
-// MARK: - TodoStore
+// MARK: - Design Tokens
 
-final class TodoStore: ObservableObject {
-    @Published var todos: [Todo] = []
+private extension Color {
+    static let bgDark  = Color(red: 0.06, green: 0.06, blue: 0.14)
+    static let bgDeep  = Color(red: 0.08, green: 0.04, blue: 0.20)
+    static let bgMid   = Color(red: 0.05, green: 0.08, blue: 0.18)
+}
 
-    private var db: Firestore? { isPreview ? nil : Firestore.firestore() }
-    private var listener: ListenerRegistration?
-    private let isPreview: Bool
+// MARK: - Glass Modifier
 
-    init(preview: Bool = false) {
-        self.isPreview = preview
+struct GlassMaterial: ViewModifier {
+    var cornerRadius: CGFloat = 16
+    var baseOpacity: Double   = 0.06
 
-        if preview {
-            self.todos = [
-                Todo(id: "1", title: "Belajar SwiftUI", notes: "State vs ObservableObject"),
-                Todo(id: "2", title: "Integrasi Firestore", notes: "Sudah selesai", isCompleted: true),
-                Todo(id: "3", title: "Submit ke App Store", notes: ""),
-            ]
-            return
-        }
-
-        listener = Firestore.firestore()
-            .collection("todos")
-            .order(by: "createdAt", descending: false)
-            .addSnapshotListener { [weak self] snapshot, error in
-                if let error = error {
-                    print("Firestore error: \(error)")
-                    return
+    func body(content: Content) -> some View {
+        content
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .fill(Color.white.opacity(baseOpacity))
                 }
-                guard let docs = snapshot?.documents else { return }
-                DispatchQueue.main.async {
-                    self?.todos = docs.compactMap { try? $0.data(as: Todo.self) }
-                }
-            }
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.28),
+                                Color.white.opacity(0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
     }
+}
 
-    deinit {
-        listener?.remove()
-    }
-
-    func add(title: String) {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        if isPreview {
-            todos.insert(Todo(id: UUID().uuidString, title: trimmed), at: 0)
-            return
-        }
-        let todo = Todo(title: trimmed)
-        do {
-            try db?.collection("todos").addDocument(from: todo)
-        } catch {
-            print("Gagal tambah todo: \(error)")
-        }
-    }
-
-    func removeTodos(at offsets: IndexSet) {
-        if isPreview {
-            todos.remove(atOffsets: offsets)
-            return
-        }
-        offsets.forEach { index in
-            let todo = todos[index]
-            guard let id = todo.id else { return }
-            db?.collection("todos").document(id).delete()
-        }
-    }
-
-    func removeTodo(id: String) {
-        if isPreview {
-            todos.removeAll { $0.id == id }
-            return
-        }
-        db?.collection("todos").document(id).delete()
-    }
-
-    func update(_ todo: Todo) {
-        if isPreview {
-            guard let i = todos.firstIndex(where: { $0.id == todo.id }) else { return }
-            todos[i] = todo
-            return
-        }
-        guard let id = todo.id else { return }
-        do {
-            try db?.collection("todos").document(id).setData(from: todo)
-        } catch {
-            print("Gagal update todo: \(error)")
-        }
-    }
-
-    func binding(for id: String) -> Binding<Todo> {
-        Binding(
-            get: {
-                self.todos.first { $0.id == id }
-                    ?? Todo(id: id, title: "", notes: "")
-            },
-            set: { updated in
-                self.update(updated)
-            }
-        )
-    }
-
-    func flushToDisk() {
-        // Tidak diperlukan — Firestore menyimpan otomatis
+extension View {
+    func glass(radius: CGFloat = 16, opacity: Double = 0.06) -> some View {
+        modifier(GlassMaterial(cornerRadius: radius, baseOpacity: opacity))
     }
 }
 
 // MARK: - ContentView
 
 struct ContentView: View {
-    @EnvironmentObject private var store: TodoStore
-    @State private var newTodoTitle = ""
 
-    private var activeTodos: [Todo] { store.todos.filter { !$0.isCompleted } }
-    private var completedTodos: [Todo] { store.todos.filter { $0.isCompleted } }
-    private var progress: Double {
-        guard !store.todos.isEmpty else { return 0 }
-        return Double(completedTodos.count) / Double(store.todos.count)
-    }
+    @EnvironmentObject private var viewModel: TaskViewModel
+    @EnvironmentObject private var auth: AuthViewModel
+
+    @State private var showAddTask        = false
+    @State private var itemToEdit: TodoItem? = nil
+    @State private var showSignOutAlert   = false
 
     var body: some View {
         NavigationStack {
-            List {
-                // Progress card
-                if !store.todos.isEmpty {
-                    Section {
-                        ProgressCard(
-                            total: store.todos.count,
-                            completed: completedTodos.count,
-                            progress: progress
-                        )
-                    }
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                    .listRowBackground(Color.clear)
-                }
+            ZStack {
+                // ── Background gradient ───────────────────────────────────
+                LinearGradient(
+                    colors: [.bgDark, .bgDeep, .bgMid],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
 
-                // Input tambah task
-                Section {
-                    AddTodoRow(title: $newTodoTitle) {
-                        store.add(title: newTodoTitle)
-                        newTodoTitle = ""
-                    }
-                }
+                ZStack(alignment: .bottomTrailing) {
+                    VStack(spacing: 0) {
 
-                // Task aktif
-                if !activeTodos.isEmpty {
-                    Section {
-                        ForEach(activeTodos) { todo in
-                            NavigationLink(value: todo.id) {
-                                TodoRowLabel(todo: todo)
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    guard let id = todo.id else { return }
-                                    store.removeTodo(id: id)
-                                } label: {
-                                    Label("Hapus", systemImage: "trash")
+                        // Stats
+                        StatsHeaderView()
+                            .padding(.horizontal, 16)
+                            .padding(.top, 4)
+                            .padding(.bottom, 14)
+
+                        // Filter tabs
+                        FilterTabsView()
+                            .padding(.bottom, 10)
+
+                        // Glass divider
+                        Rectangle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(height: 1)
+
+                        // Task list
+                        if viewModel.isLoading && viewModel.items.isEmpty {
+                            Spacer()
+                            ProgressView("Loading…").tint(.white)
+                            Spacer()
+                        } else if viewModel.filteredItems.isEmpty {
+                            TaskEmptyStateView(filter: viewModel.selectedFilter)
+                        } else {
+                            List {
+                                ForEach(viewModel.filteredItems) { item in
+                                    TaskCardView(item: item)
+                                        .listRowBackground(Color.clear)
+                                        .listRowSeparator(.hidden)
+                                        .listRowInsets(EdgeInsets(
+                                            top: 5, leading: 16,
+                                            bottom: 5, trailing: 16
+                                        ))
+                                        .contentShape(Rectangle())
+                                        .onTapGesture { itemToEdit = item }
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                            Button(role: .destructive) {
+                                                if let id = item.id { viewModel.deleteItem(id: id) }
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
+                                        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                            let next = nextStatus(for: item)
+                                            Button { viewModel.cycleStatus(for: item) } label: {
+                                                Label(next.label, systemImage: next.icon)
+                                            }
+                                            .tint(next.color)
+                                        }
                                 }
                             }
-                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                Button {
-                                    var updated = todo
-                                    updated.isCompleted = true
-                                    store.update(updated)
-                                } label: {
-                                    Label("Selesai", systemImage: "checkmark")
-                                }
-                                .tint(.green)
-                            }
+                            .listStyle(.plain)
+                            .scrollContentBackground(.hidden)
                         }
-                    } header: {
-                        SectionHeader(
-                            icon: "circle.dotted",
-                            title: "Aktif",
-                            count: activeTodos.count
-                        )
                     }
-                }
 
-                // Empty state
-                if store.todos.isEmpty {
-                    Section {
-                        EmptyStateView()
-                    }
-                    .listRowBackground(Color.clear)
-                }
-
-                // Task selesai
-                if !completedTodos.isEmpty {
-                    Section {
-                        ForEach(completedTodos) { todo in
-                            NavigationLink(value: todo.id) {
-                                TodoRowLabel(todo: todo)
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    guard let id = todo.id else { return }
-                                    store.removeTodo(id: id)
-                                } label: {
-                                    Label("Hapus", systemImage: "trash")
-                                }
-                            }
-                            .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                Button {
-                                    var updated = todo
-                                    updated.isCompleted = false
-                                    store.update(updated)
-                                } label: {
-                                    Label("Aktifkan", systemImage: "arrow.uturn.left")
-                                }
-                                .tint(.orange)
-                            }
+                    // ── FAB ───────────────────────────────────────────────
+                    Button { showAddTask = true } label: {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.accentColor, Color.accentColor.opacity(0.65)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 60, height: 60)
+                                .shadow(color: Color.accentColor.opacity(0.55), radius: 16, x: 0, y: 7)
+                            Image(systemName: "plus")
+                                .font(.title2.bold())
+                                .foregroundColor(.white)
                         }
-                    } header: {
-                        SectionHeader(
-                            icon: "checkmark.circle",
-                            title: "Selesai",
-                            count: completedTodos.count
-                        )
                     }
+                    .padding(.trailing, 22)
+                    .padding(.bottom, 30)
                 }
             }
             .navigationTitle("My Tasks")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(.clear, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
+                    SearchBarButton()
                 }
-            }
-            .navigationDestination(for: String.self) { id in
-                TodoDetailView(todo: store.binding(for: id))
-            }
-        }
-    }
-}
-
-// MARK: - Progress Card
-
-private struct ProgressCard: View {
-    let total: Int
-    let completed: Int
-    let progress: Double
-
-    private var tint: Color { progress >= 1.0 ? .green : .accentColor }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(completed) dari \(total) task selesai")
-                        .font(.subheadline.weight(.medium))
-                    if progress >= 1.0 {
-                        Text("Semua task sudah selesai!")
-                            .font(.caption)
-                            .foregroundStyle(.green)
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button { showSignOutAlert = true } label: {
+                        Image(systemName: "person.circle")
+                            .foregroundColor(.white.opacity(0.75))
                     }
                 }
-                Spacer()
-                Text("\(Int(progress * 100))%")
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(tint)
-                    .contentTransition(.numericText())
             }
-            ProgressView(value: progress)
-                .tint(tint)
-                .animation(.spring(response: 0.4), value: progress)
+            .confirmationDialog(
+                "Sign out of your account?",
+                isPresented: $showSignOutAlert,
+                titleVisibility: .visible
+            ) {
+                Button("Sign Out", role: .destructive) { auth.signOut() }
+                Button("Cancel", role: .cancel) {}
+            }
+            .sheet(isPresented: $showAddTask) { AddEditTaskView() }
+            .sheet(item: $itemToEdit) { item in AddEditTaskView(existingItem: item) }
         }
-        .padding(.vertical, 8)
+        .preferredColorScheme(.dark)
+    }
+
+    private func nextStatus(for item: TodoItem) -> TaskStatus {
+        switch item.status {
+        case .todo:       return .inProgress
+        case .inProgress: return .done
+        case .done:       return .todo
+        }
     }
 }
 
-// MARK: - Section Header
+// MARK: - Search Bar
 
-private struct SectionHeader: View {
-    let icon: String
-    let title: String
-    let count: Int
+private struct SearchBarButton: View {
+    @EnvironmentObject private var viewModel: TaskViewModel
+    @State private var isExpanded = false
 
     var body: some View {
-        Label {
-            Text("\(title) (\(count))")
-        } icon: {
-            Image(systemName: icon)
+        if isExpanded {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.white.opacity(0.5))
+                TextField("Search…", text: $viewModel.searchText)
+                    .foregroundColor(.white)
+                    .frame(width: 120)
+                Button {
+                    viewModel.searchText = ""
+                    withAnimation { isExpanded = false }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
+            .transition(.move(edge: .trailing).combined(with: .opacity))
+        } else {
+            Button {
+                withAnimation { isExpanded = true }
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.white.opacity(0.75))
+            }
         }
-        .font(.footnote.weight(.semibold))
-        .foregroundStyle(.primary)
-        .textCase(nil)
     }
 }
 
-// MARK: - Todo Row Label
+// MARK: - Stats Header
 
-private struct TodoRowLabel: View {
-    let todo: Todo
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .strokeBorder(
-                        todo.isCompleted ? Color.green : Color.secondary.opacity(0.4),
-                        lineWidth: 1.5
-                    )
-                    .frame(width: 26, height: 26)
-                if todo.isCompleted {
-                    Circle()
-                        .fill(Color.green.opacity(0.15))
-                        .frame(width: 26, height: 26)
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.green)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(todo.title)
-                    .font(.body)
-                    .strikethrough(todo.isCompleted, color: .secondary)
-                    .foregroundStyle(todo.isCompleted ? .secondary : .primary)
-                if !todo.notes.isEmpty {
-                    Text(todo.notes)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer()
-        }
-        .padding(.vertical, 3)
-    }
-}
-
-// MARK: - Add Todo Row
-
-private struct AddTodoRow: View {
-    @Binding var title: String
-    var onCommit: () -> Void
-    @FocusState private var isFocused: Bool
-
-    private var canAdd: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
+private struct StatsHeaderView: View {
+    @EnvironmentObject private var viewModel: TaskViewModel
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "plus.circle.fill")
-                .font(.title3)
-                .foregroundStyle(isFocused ? .accentColor : .secondary)
-                .animation(.easeInOut(duration: 0.2), value: isFocused)
-
-            TextField("Tambah task baru…", text: $title)
-                .textInputAutocapitalization(.sentences)
-                .focused($isFocused)
-                .onSubmit(onCommit)
-
-            if canAdd {
-                Button(action: onCommit) {
-                    Text("Tambah")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.accentColor, in: Capsule())
-                }
-                .transition(.scale(scale: 0.8).combined(with: .opacity))
-            }
+            GlassStatPill(
+                label: "Active", count: viewModel.activeCount,
+                color: .accentColor, icon: "tray.full"
+            )
+            GlassStatPill(
+                label: "Today",  count: viewModel.todayCount,
+                color: .orange,   icon: "calendar"
+            )
+            GlassStatPill(
+                label: "Done",   count: viewModel.doneCount,
+                color: .green,    icon: "checkmark.circle"
+            )
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: canAdd)
+    }
+}
+
+private struct GlassStatPill: View {
+    let label: String
+    let count: Int
+    let color: Color
+    let icon: String
+
+    var body: some View {
+        VStack(spacing: 5) {
+            HStack(spacing: 4) {
+                Image(systemName: icon).font(.caption2)
+                Text("\(count)")
+                    .font(.title3.bold())
+                    .contentTransition(.numericText())
+            }
+            .foregroundColor(color)
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.45))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .glass(radius: 14, opacity: 0.05)
+        .shadow(color: color.opacity(0.18), radius: 8, x: 0, y: 4)
+    }
+}
+
+// MARK: - Filter Tabs
+
+private struct FilterTabsView: View {
+    @EnvironmentObject private var viewModel: TaskViewModel
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(TaskFilter.allCases) { filter in
+                    FilterChip(
+                        filter: filter,
+                        isSelected: viewModel.selectedFilter == filter
+                    ) {
+                        withAnimation(.spring(response: 0.3)) {
+                            viewModel.selectedFilter = filter
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+}
+
+private struct FilterChip: View {
+    let filter: TaskFilter
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            Label(filter.rawValue, systemImage: filter.icon)
+                .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                .foregroundColor(isSelected ? .white : .white.opacity(0.55))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 9)
+                .background(
+                    Group {
+                        if isSelected {
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .shadow(color: Color.accentColor.opacity(0.4), radius: 8, x: 0, y: 4)
+                        } else {
+                            Capsule()
+                                .fill(Color.white.opacity(0.08))
+                                .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        }
+                    }
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Task Card
+
+struct TaskCardView: View {
+    let item: TodoItem
+    @EnvironmentObject private var viewModel: TaskViewModel
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            // Priority strip
+            RoundedRectangle(cornerRadius: 2)
+                .fill(
+                    LinearGradient(
+                        colors: [item.priority.color, item.priority.color.opacity(0.3)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 3)
+                .padding(.vertical, 14)
+                .padding(.leading, 14)
+
+            HStack(alignment: .top, spacing: 12) {
+                // Status toggle
+                Button {
+                    withAnimation(.spring(response: 0.3)) {
+                        viewModel.toggleDone(item)
+                    }
+                } label: {
+                    Image(systemName: statusIcon)
+                        .font(.title2)
+                        .foregroundColor(item.status.color)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 1)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    // Title + badge
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(item.title)
+                            .font(.body.weight(.semibold))
+                            .strikethrough(item.status == .done, color: .white.opacity(0.35))
+                            .foregroundColor(item.status == .done ? .white.opacity(0.35) : .white)
+                            .lineLimit(2)
+                        Spacer(minLength: 4)
+                        PriorityBadge(priority: item.priority)
+                    }
+
+                    // Note
+                    if let note = item.note, !note.isEmpty {
+                        Text(note)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.45))
+                            .lineLimit(1)
+                    }
+
+                    // Meta row
+                    HStack(spacing: 6) {
+                        if let dateStr = item.formattedDueDate {
+                            Label(dateStr, systemImage: "calendar")
+                                .font(.caption2.weight(.medium))
+                                .foregroundColor(item.isOverdue ? .red : .white.opacity(0.45))
+                        }
+                        if let cat = item.category, !cat.isEmpty {
+                            if item.formattedDueDate != nil {
+                                Text("·")
+                                    .foregroundColor(.white.opacity(0.25))
+                                    .font(.caption2)
+                            }
+                            Label(cat, systemImage: "folder")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.45))
+                        }
+                        Spacer()
+                        if item.status != .done {
+                            StatusChip(status: item.status)
+                        }
+                    }
+                }
+            }
+            .padding(.top, 14)
+            .padding(.bottom, 14)
+            .padding(.leading, 12)
+            .padding(.trailing, 14)
+        }
+        .glass(radius: 16, opacity: 0.05)
+        .shadow(
+            color: item.priority.color.opacity(item.isOverdue ? 0.3 : 0.12),
+            radius: 10, x: 0, y: 5
+        )
+    }
+
+    private var statusIcon: String {
+        switch item.status {
+        case .todo:       return "circle"
+        case .inProgress: return "clock.fill"
+        case .done:       return "checkmark.circle.fill"
+        }
+    }
+}
+
+// MARK: - Priority Badge
+
+struct PriorityBadge: View {
+    let priority: Priority
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: priority.icon)
+                .font(.system(size: 8, weight: .bold))
+            Text(priority.label.uppercased())
+                .font(.system(size: 8, weight: .bold))
+                .tracking(0.3)
+        }
+        .foregroundColor(priority.color)
+        .padding(.horizontal, 7)
         .padding(.vertical, 4)
+        .background(priority.color.opacity(0.18))
+        .overlay(
+            Capsule().stroke(priority.color.opacity(0.35), lineWidth: 1)
+        )
+        .clipShape(Capsule())
+    }
+}
+
+// MARK: - Status Chip
+
+struct StatusChip: View {
+    let status: TaskStatus
+
+    var body: some View {
+        Label(status.label, systemImage: status.icon)
+            .font(.caption2.weight(.medium))
+            .foregroundColor(status.color)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(status.color.opacity(0.15))
+            .overlay(Capsule().stroke(status.color.opacity(0.3), lineWidth: 1))
+            .clipShape(Capsule())
     }
 }
 
 // MARK: - Empty State
 
-private struct EmptyStateView: View {
+private struct TaskEmptyStateView: View {
+    let filter: TaskFilter
+
     var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "checklist")
-                .font(.system(size: 52))
-                .foregroundStyle(.secondary.opacity(0.4))
-            Text("Belum ada task")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            Text("Tambahkan task pertama kamu di atas")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
+        VStack(spacing: 18) {
+            Spacer()
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.05))
+                    .frame(width: 90, height: 90)
+                Image(systemName: emptyIcon)
+                    .font(.system(size: 36))
+                    .foregroundColor(.white.opacity(0.25))
+            }
+            VStack(spacing: 6) {
+                Text(emptyTitle)
+                    .font(.headline)
+                    .foregroundColor(.white.opacity(0.55))
+                Text(emptySubtitle)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.3))
+                    .multilineTextAlignment(.center)
+            }
+            Spacer()
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 48)
+        .padding(.horizontal, 40)
     }
-}
 
-// MARK: - Detail View
-
-struct TodoDetailView: View {
-    @Binding var todo: Todo
-    @EnvironmentObject private var store: TodoStore
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        Form {
-            Section {
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .strokeBorder(
-                                todo.isCompleted ? Color.green : Color.secondary.opacity(0.4),
-                                lineWidth: 2
-                            )
-                            .frame(width: 28, height: 28)
-                        if todo.isCompleted {
-                            Circle()
-                                .fill(Color.green.opacity(0.15))
-                                .frame(width: 28, height: 28)
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(.green)
-                        }
-                    }
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.3)) {
-                            todo.isCompleted.toggle()
-                        }
-                    }
-                    TextField("Judul task", text: $todo.title)
-                        .font(.body.weight(.medium))
-                }
-            } header: {
-                Text("Task")
-            }
-
-            Section {
-                TextField("Tambah catatan…", text: $todo.notes, axis: .vertical)
-                    .lineLimit(3 ... 8)
-            } header: {
-                Text("Catatan")
-            }
-
-            Section {
-                Toggle(isOn: $todo.isCompleted.animation()) {
-                    Label {
-                        Text("Tandai Selesai")
-                    } icon: {
-                        Image(systemName: todo.isCompleted ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(todo.isCompleted ? .green : .secondary)
-                    }
-                }
-                .tint(.green)
-            }
-
-            Section {
-                Button(role: .destructive) {
-                    guard let id = todo.id else { return }
-                    store.removeTodo(id: id)
-                    dismiss()
-                } label: {
-                    HStack {
-                        Spacer()
-                        Label("Hapus Task", systemImage: "trash")
-                        Spacer()
-                    }
-                }
-            }
+    private var emptyIcon: String {
+        switch filter {
+        case .all:   return "checklist"
+        case .today: return "calendar.badge.checkmark"
+        case .done:  return "checkmark.seal"
         }
-        .navigationTitle(todo.isCompleted ? "Task Selesai" : "Edit Task")
-        .navigationBarTitleDisplayMode(.inline)
+    }
+    private var emptyTitle: String {
+        switch filter {
+        case .all:   return "No active tasks"
+        case .today: return "Nothing due today"
+        case .done:  return "No completed tasks"
+        }
+    }
+    private var emptySubtitle: String {
+        switch filter {
+        case .all:   return "Tap + to add your first task"
+        case .today: return "All caught up — enjoy your day!"
+        case .done:  return "Finish a task to see it here"
+        }
     }
 }
 
@@ -480,6 +533,7 @@ struct TodoDetailView: View {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
-            .environmentObject(TodoStore(preview: true))
+            .environmentObject(TaskViewModel(userId: "preview"))
+            .environmentObject(AuthViewModel())
     }
 }

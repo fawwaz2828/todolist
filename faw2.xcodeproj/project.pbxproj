@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D70154B12F977BD50019C71D /* Task.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70154B02F977BD40019C71D /* Task.swift */; };
+		D70154B32F977BE30019C71D /* TaskViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70154B22F977BE30019C71D /* TaskViewModel.swift */; };
+		D70154B52F977BEF0019C71D /* AddEditTaskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70154B42F977BEF0019C71D /* AddEditTaskView.swift */; };
 		D734BD412F7DF5610018DCB2 /* faw2App.swift in Sources */ = {isa = PBXBuildFile; fileRef = D734BD402F7DF5610018DCB2 /* faw2App.swift */; };
 		D734BD432F7DF5610018DCB2 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D734BD422F7DF5610018DCB2 /* ContentView.swift */; };
 		D734BD452F7DF5720018DCB2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D734BD442F7DF5720018DCB2 /* Assets.xcassets */; };
@@ -16,6 +19,9 @@
 		D734BD5E2F7DF5720018DCB2 /* faw2UITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D734BD5D2F7DF5720018DCB2 /* faw2UITestsLaunchTests.swift */; };
 		D734BD6B2F7DFD410018DCB2 /* Todo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D734BD6A2F7DFD410018DCB2 /* Todo.swift */; };
 		D75F4B9B2F8FB91A00B480AA /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = D75F4B9A2F8FB91A00B480AA /* FirebaseFirestore */; };
+		D776FB072F90F6180052CE7F /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = D776FB062F90F6180052CE7F /* FirebaseAuth */; };
+		D776FB0F2F90F9A80052CE7F /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D776FB0E2F90F9A80052CE7F /* AuthView.swift */; };
+		D776FB112F90F9BB0052CE7F /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D776FB102F90F9BB0052CE7F /* AuthViewModel.swift */; };
 		D7CCC3CC2F8FB21F00A90116 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D7CCC3CB2F8FB21E00A90116 /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
@@ -37,6 +43,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		D70154B02F977BD40019C71D /* Task.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Task.swift; sourceTree = "<group>"; };
+		D70154B22F977BE30019C71D /* TaskViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TaskViewModel.swift; sourceTree = "<group>"; };
+		D70154B42F977BEF0019C71D /* AddEditTaskView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AddEditTaskView.swift; sourceTree = "<group>"; };
 		D734BD3D2F7DF5610018DCB2 /* faw2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = faw2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D734BD402F7DF5610018DCB2 /* faw2App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = faw2App.swift; sourceTree = "<group>"; };
 		D734BD422F7DF5610018DCB2 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -48,6 +57,8 @@
 		D734BD5B2F7DF5720018DCB2 /* faw2UITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = faw2UITests.swift; sourceTree = "<group>"; };
 		D734BD5D2F7DF5720018DCB2 /* faw2UITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = faw2UITestsLaunchTests.swift; sourceTree = "<group>"; };
 		D734BD6A2F7DFD410018DCB2 /* Todo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Todo.swift; sourceTree = "<group>"; };
+		D776FB0E2F90F9A80052CE7F /* AuthView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		D776FB102F90F9BB0052CE7F /* AuthViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		D7CCC3CB2F8FB21E00A90116 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "../../../Downloads/GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -57,6 +68,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D75F4B9B2F8FB91A00B480AA /* FirebaseFirestore in Frameworks */,
+				D776FB072F90F6180052CE7F /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -101,6 +113,11 @@
 		D734BD3F2F7DF5610018DCB2 /* faw2 */ = {
 			isa = PBXGroup;
 			children = (
+				D70154B42F977BEF0019C71D /* AddEditTaskView.swift */,
+				D70154B22F977BE30019C71D /* TaskViewModel.swift */,
+				D70154B02F977BD40019C71D /* Task.swift */,
+				D776FB102F90F9BB0052CE7F /* AuthViewModel.swift */,
+				D776FB0E2F90F9A80052CE7F /* AuthView.swift */,
 				D7CCC3CB2F8FB21E00A90116 /* GoogleService-Info.plist */,
 				D734BD6A2F7DFD410018DCB2 /* Todo.swift */,
 				D734BD402F7DF5610018DCB2 /* faw2App.swift */,
@@ -161,6 +178,7 @@
 			name = faw2;
 			packageProductDependencies = (
 				D75F4B9A2F8FB91A00B480AA /* FirebaseFirestore */,
+				D776FB062F90F6180052CE7F /* FirebaseAuth */,
 			);
 			productName = faw2;
 			productReference = D734BD3D2F7DF5610018DCB2 /* faw2.app */;
@@ -280,8 +298,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D776FB112F90F9BB0052CE7F /* AuthViewModel.swift in Sources */,
+				D70154B32F977BE30019C71D /* TaskViewModel.swift in Sources */,
 				D734BD432F7DF5610018DCB2 /* ContentView.swift in Sources */,
 				D734BD6B2F7DFD410018DCB2 /* Todo.swift in Sources */,
+				D776FB0F2F90F9A80052CE7F /* AuthView.swift in Sources */,
+				D70154B52F977BEF0019C71D /* AddEditTaskView.swift in Sources */,
+				D70154B12F977BD50019C71D /* Task.swift in Sources */,
 				D734BD412F7DF5610018DCB2 /* faw2App.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -618,6 +641,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D75F4B992F8FB91A00B480AA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
+		};
+		D776FB062F90F6180052CE7F /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D75F4B992F8FB91A00B480AA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
